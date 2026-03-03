@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HornPub - Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            DEFAULT: '#ff9000',
+                            hover: '#ffa32a'
+                        },
+                        dark: {
+                            base: '#000000',
+                            surface: '#111111',
+                            border: '#222222',
+                            input: '#1a1a1a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar for dark theme */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #333333; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #ff9000; }
+        
+        .fade-in { animation: fadeIn 0.2s ease-in-out; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-dark-base text-neutral-300 h-screen flex overflow-hidden font-sans selection:bg-brand/30 selection:text-brand">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-dark-surface border-r border-dark-border flex flex-col h-full z-10 shrink-0">
+        <div class="px-4 py-4 border-b border-dark-border flex items-center justify-between">
+            <div>
+                <div class="flex items-center text-xl font-bold tracking-tighter cursor-default select-none">
+                    <span class="text-white">Horn</span>
+                    <span class="bg-brand text-black px-1 rounded-sm ml-0.5">Pub</span>
+                </div>
+                <p class="text-[9px] font-bold text-neutral-500 mt-0.5 tracking-wider uppercase leading-none">Operations Portal</p>
+            </div>
+            <div class="bg-dark-input p-1.5 rounded border border-dark-border" title="Network Status: Online">
+                <div class="w-2 h-2 rounded-full bg-brand animate-pulse"></div>
+            </div>
+        </div>
+        
+        <!-- Search -->
+        <div class="px-3 py-2 bg-dark-base border-b border-dark-border">
+            <div class="relative group">
+                <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 top-2 text-neutral-500 group-focus-within:text-brand transition-colors"></i>
+                <input type="text" id="search-input" placeholder="Search tools..." class="w-full pl-8 pr-2 py-1.5 text-xs border border-dark-border rounded focus:ring-1 focus:ring-brand focus:border-brand bg-dark-input text-white transition-all shadow-sm outline-none placeholder-neutral-600">
+            </div>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-2 space-y-0.5" id="sidebar-nav">
+            <!-- Navigation items generated here -->
+        </div>
+
+        <!-- Settings / Proxy Toggle -->
+        <div class="p-3 border-t border-dark-border bg-dark-base">
+            <label class="flex items-center justify-between cursor-pointer p-1.5 hover:bg-dark-surface rounded transition-colors group">
+                <span class="text-[10px] font-bold text-neutral-500 uppercase tracking-wider group-hover:text-neutral-300">Net Proxy</span>
+                <div class="relative inline-flex h-4 w-7 items-center rounded-full bg-neutral-800 transition-colors peer-checked:bg-brand has-[:checked]:bg-brand">
+                    <input type="checkbox" id="use-proxy" class="peer sr-only" checked>
+                    <span class="inline-block h-2.5 w-2.5 transform rounded-full bg-black transition-transform peer-checked:translate-x-3 ml-0.5"></span>
+                </div>
+            </label>
+        </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden min-w-0 bg-dark-base">
+        
+        <!-- Header -->
+        <header class="bg-dark-surface px-5 py-3 flex justify-between items-center border-b border-dark-border shadow-sm z-0">
+            <div class="min-w-0 flex-1 flex items-center gap-3">
+                <h2 id="action-title" class="text-lg font-bold text-white tracking-tight truncate">Select an Action</h2>
+                <span id="action-subtitle" class="text-xs text-neutral-500 flex items-center gap-1.5 mt-0.5 border-l border-dark-border pl-3 hidden sm:flex">
+                    <i data-lucide="info" class="w-3.5 h-3.5 text-brand"></i> Config ready
+                </span>
+            </div>
+            
+            <div class="flex items-center gap-3 shrink-0 ml-4">
+                <button id="reset-form-btn" class="text-xs font-semibold text-neutral-500 hover:text-brand transition-colors flex items-center gap-1 hidden bg-dark-input px-2.5 py-1.5 rounded border border-dark-border hover:border-brand/50">
+                    <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Clear
+                </button>
+                <button id="execute-btn" class="flex items-center gap-1.5 bg-brand hover:bg-brand-hover text-black px-4 py-1.5 rounded font-bold transition-all focus:ring-2 focus:ring-brand/50 disabled:opacity-50 disabled:cursor-not-allowed hidden uppercase tracking-wide text-[11px] shadow-[0_0_10px_rgba(255,144,0,0.2)] hover:shadow-[0_0_15px_rgba(255,144,0,0.4)]">
+                    <i data-lucide="play" class="w-3.5 h-3.5 fill-current" id="execute-icon"></i>
+                    <div id="execute-spinner" class="hidden animate-spin rounded-full h-3 w-3 border-2 border-black border-t-transparent"></div>
+                    <span>Execute</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <div class="flex-1 overflow-hidden flex flex-col lg:flex-row p-3 gap-3 w-full">
+            
+            <!-- Input Form -->
+            <div class="w-full lg:w-1/3 flex flex-col h-full bg-dark-surface rounded border border-dark-border shadow-md overflow-hidden flex-shrink-0 min-w-[320px]">
+                <div class="px-3 py-2 border-b border-dark-border bg-[#161616] flex items-center gap-2">
+                    <i data-lucide="terminal-square" class="w-3.5 h-3.5 text-brand"></i>
+                    <h3 class="font-bold text-white uppercase tracking-wide text-[10px]">Parameters & Controls</h3>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar relative">
+                    <form id="dynamic-form" class="space-y-4">
+                        <div class="text-center flex flex-col items-center justify-center text-neutral-600 py-10 h-full">
+                            <i data-lucide="mouse-pointer-click" class="w-8 h-8 mb-2 text-neutral-700"></i>
+                            <p class="text-xs font-medium">Select a task from the sidebar.</p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="w-full lg:w-2/3 flex flex-col h-full bg-dark-surface rounded border border-dark-border shadow-md overflow-hidden relative">
+                <div class="px-3 py-2 border-b border-dark-border bg-[#161616] flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5 text-brand"></i>
+                        <h3 class="font-bold text-white uppercase tracking-wide text-[10px]">Output</h3>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div id="status-badge" class="hidden px-2 py-0.5 rounded text-[10px] font-bold transition-all fade-in leading-none flex items-center h-5">
+                            <!-- Status injected here -->
+                        </div>
+                        <button id="copy-result-btn" class="hidden text-neutral-500 hover:text-white transition-colors p-1 bg-dark-input rounded border border-dark-border hover:border-brand" title="Copy Raw JSON">
+                            <i data-lucide="copy" class="w-3 h-3" id="copy-icon-out"></i>
+                            <i data-lucide="check" class="w-3 h-3 text-green-500 hidden" id="copy-success-icon-out"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-4 relative bg-dark-base">
+                    <div id="loading-overlay" class="hidden absolute inset-0 bg-dark-base/80 flex flex-col items-center justify-center backdrop-blur-[2px] z-10">
+                        <div class="animate-spin rounded-full h-8 w-8 border-[3px] border-neutral-800 border-t-brand mb-2"></div>
+                        <p class="text-[10px] font-bold text-brand uppercase tracking-widest">Processing</p>
+                    </div>
+                    
+                    <div id="result-container" class="h-full">
+                        <div class="flex flex-col items-center justify-center text-neutral-600 h-full text-center">
+                            <i data-lucide="inbox" class="w-10 h-10 mb-2 text-neutral-800"></i>
+                            <p class="text-xs font-medium">Awaiting execution.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Embedded Postman Collection Data
+        const collectionData = {
+          "info": { "name": "May Pakinabang" },
+          "item": [
+            // --- 1. Primary Action ---
+            { "name": "Search ONU", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"serialNumber\":\"YOTCF665CB22\"\n    }" }, "url": { "raw": "https://ibas.s2s.ph/api/tech/search-serial" } } },
+            
+            // --- 2. ONU Commands ---
+            { "name": "Manual Activate AAA", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"referenceNumber\": \"S2S_54661841769669401921\",\n    \"serialNumber\": \"YOTCF650102E\"\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/ibas/activate-aaa" } } },
+            { "name": "Manual OLT Activate", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"serialNumber\" : \"SKYWB809D111\",\n    \"referenceNumber\" : \"S2S_48475711727683436407\",\n    \"olt\" : \"VAL007-OLT-02\"\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/ibas/manual/activate" } } },
+            { "name": "Update Serial 3A", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\r\n    \"trans\": \"updateSerial\",\r\n    \"accountID\": \"638779799517\",\r\n    \"serial\": \"594F544369D118B7\"    \r\n}" }, "url": { "raw": "http://161.49.61.47/radiusApi/prepaid_fiber_api/serial_update_superfiber.php" } } },
+            { "name": "Update Activation", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"referenceNumber\": \"S2S_03467041770261295700\",\n    \"accountNumber\": \"999912835305\",\n    \"serialNumber\": \"YOTCF658E9E6\"\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/update-activation" } } },
+            { "name": "Unregister", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\r\n    \"referenceNumber\" : \"S2S_59824111763967907892\",\r\n    \"status\" : \"PAID\"\r\n}" }, "url": { "raw": "https://ibas-testing.s2s.ph/api/ibas-device-unregister" } } },
+            { "name": "Get ONU ID", "request": { "method": "GET", "header": [], "url": { "raw": "https://ibas.s2s.ph/api/ibas/discovery-onu-numbers?referenceNumber=S2S_96538431744195185963", "query": [{ "key": "referenceNumber", "value": "S2S_96538431744195185963" }] } } },
+            { "name": "Check Refno", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"referenceNo\":\"S2S_6861363177080186146\"\n}" }, "url": { "raw": "https://broker.s2s.ph/api/broker/drs/check-s2s-refrence-no" } } },
+            { "name": "Optical Power Reading", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\r\n    \"serialNumber\": \"638776768033\"\r\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/onu-device/optical-power" } } },
+            { "name": "Show ONU Details", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"serialNumber\":\"YOTCF665CB22\"\n    }" }, "url": { "raw": "https://ibas.s2s.ph/api/tools/show-onu-detail" } } },
+            { "name": "ONT Version", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"serialNumber\":\"YOTCF665CB22\"\n    }" }, "url": { "raw": "https://ibas.s2s.ph/api/ibas/ont-version" } } },
+            
+            // --- 3. Other Tools ---
+            { "name": "Force Manual load Reprocess", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "c2stUzJwVWxVRjNhSmtrS3NhTQ==" }], "body": { "mode": "raw", "raw": "{\r\n    \"referenceNumber\" : \"PAY_5946808027696924\",\r\n    \"force\" : true\r\n}" }, "url": { "raw": "https://load.s2s.ph/api/manual-reprocess" } } },
+            { "name": "Voucher Load", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"accountNumber\" : \"638774266636\",\n    \"pin\" : \"0996060180711376\"\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/prepaid-fiber/load" } } },
+            { "name": "Search payment", "request": { "method": "GET", "header": [], "url": { "raw": "https://ibas.s2s.ph/api/acquisition/payment?referenceNumber=S2S_09012931766540707879", "query": [{ "key": "referenceNumber", "value": "S2S_09012931766540707879" }] } } },
+            { "name": "IBAS Search", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\n    \"query\": \"S2S_21673131770793105003\",\n    \"type\": \"\"\n}" }, "url": { "raw": "https://ibas-testing.s2s.ph/api/acquisition/search" } } },
+            { "name": "Activate signup list", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\r\n    \"referenceNumber\" : \"S2S_99438751761895049366\",\r\n    \"status\" : \"ACTIVATED\"\r\n}" }, "url": { "raw": "https://ibas-testing.s2s.ph/api/ibas-device-unregister" } } },
+            { "name": "Create JO", "request": { "method": "POST", "header": [], "body": { "mode": "raw", "raw": "{\r\n    \"referenceNumber\" : \"S2S_1704272743578\"\r\n}" }, "url": { "raw": "https://ibas.s2s.ph/api/acquisition/create-job-order" } } }
+          ]
+        };
+
+        const onuCommands = [
+            "Manual Activate AAA", "Manual OLT Activate", "Update Serial 3A", 
+            "Update Activation", "Unregister", "Get ONU ID", "Check Refno", 
+            "Optical Power Reading", "Show ONU Details", "ONT Version"
+        ];
+
+        // State variables
+        let currentIndex = -1;
+        let originalJsonSchema = {}; 
+        let inputStateCache = {}; 
+        let currentOnuData = null; 
+        let latestResultData = null;
+
+        // DOM Elements
+        const navEl = document.getElementById('sidebar-nav');
+        const searchInput = document.getElementById('search-input');
+        const titleEl = document.getElementById('action-title');
+        const formEl = document.getElementById('dynamic-form');
+        const executeBtn = document.getElementById('execute-btn');
+        const executeIcon = document.getElementById('execute-icon');
+        const executeSpinner = document.getElementById('execute-spinner');
+        const resultContainer = document.getElementById('result-container');
+        const statusBadgeEl = document.getElementById('status-badge');
+        const useProxyCheckbox = document.getElementById('use-proxy');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const resetFormBtn = document.getElementById('reset-form-btn');
+        const copyResultBtn = document.getElementById('copy-result-btn');
+
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Search Filter
+        searchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            const buttons = navEl.querySelectorAll('button');
+            buttons.forEach(btn => {
+                const name = btn.querySelector('span.flex-1').textContent.toLowerCase();
+                btn.style.display = name.includes(term) ? 'flex' : 'none';
+            });
+        });
+
+        function renderSidebarItem(index, isCommand = false) {
+            const item = collectionData.item[index];
+            const btn = document.createElement('button');
+            const isActive = index === currentIndex;
+            
+            btn.className = `w-full text-left px-3 py-1.5 rounded-sm mb-0.5 flex items-center gap-2 group transition-colors outline-none 
+                ${isActive ? 'bg-dark-input text-brand shadow-sm border-l-2 border-brand font-bold' : 'hover:bg-dark-input text-neutral-400 border-l-2 border-transparent focus:bg-dark-input font-medium'} 
+                ${isCommand ? 'ml-3 w-[calc(100%-0.75rem)] text-[11px]' : 'text-xs'}`;
+            
+            let iconName = 'arrow-right-circle';
+            const nameLower = item.name.toLowerCase();
+            if(nameLower.includes('search') || nameLower.includes('show') || nameLower.includes('get')) iconName = 'search';
+            else if(nameLower.includes('activate') || nameLower.includes('update')) iconName = 'zap';
+            else if(nameLower.includes('power') || nameLower.includes('olt')) iconName = 'activity';
+            else if(nameLower.includes('unregister')) iconName = 'user-minus';
+            else if(nameLower.includes('load')) iconName = 'credit-card';
+
+            btn.innerHTML = `
+                <i data-lucide="${iconName}" class="w-3.5 h-3.5 ${isActive ? 'text-brand' : 'text-neutral-600 group-hover:text-neutral-400'}"></i>
+                <span class="truncate flex-1 leading-tight">${item.name}</span>
+            `;
+            
+            btn.onclick = () => selectAction(index);
+            navEl.appendChild(btn);
+        }
+
+        // 1. Render Sidebar with Categories
+        function renderSidebar() {
+            navEl.innerHTML = '';
+            
+            const createCategoryHeader = (text, extraHtml = '') => {
+                return `<div class="px-2 py-1 text-[9px] font-bold text-neutral-600 uppercase tracking-widest mt-2 mb-1 flex items-center justify-between border-b border-dark-border/50 pb-1">
+                    <span>${text}</span>
+                    ${extraHtml}
+                </div>`;
+            };
+
+            // Main Search
+            navEl.innerHTML += createCategoryHeader('Target ID');
+            renderSidebarItem(0); 
+            
+            // Context Commands (Still accessible in sidebar, but also explicitly added to Search ONU view)
+            const onuBadge = currentOnuData 
+                ? `<span class="bg-brand/20 text-brand px-1.5 rounded text-[8px] truncate max-w-[80px]" title="${currentOnuData.serialNumber}">${currentOnuData.serialNumber}</span>` 
+                : `<span class="bg-neutral-800 text-neutral-500 px-1.5 rounded text-[8px]">NONE</span>`;
+            
+            navEl.innerHTML += createCategoryHeader('ONU Commands', onuBadge);
+            
+            onuCommands.forEach(cmdName => {
+                const idx = collectionData.item.findIndex(i => i.name === cmdName);
+                if(idx !== -1) renderSidebarItem(idx, true);
+            });
+            
+            // Other Tools
+            navEl.innerHTML += createCategoryHeader('Other Tools');
+            collectionData.item.forEach((item, index) => {
+                if(item.name !== "Search ONU" && !onuCommands.includes(item.name)) {
+                    renderSidebarItem(index);
+                }
+            });
+            
+            lucide.createIcons();
+        }
+
+        // 2. Select Action
+        function selectAction(index) {
+            currentIndex = index;
+            const item = collectionData.item[index];
+            const request = item.request;
+            
+            renderSidebar(); 
+            titleEl.textContent = item.name;
+            executeBtn.classList.remove('hidden');
+            resetFormBtn.classList.remove('hidden');
+
+            resultContainer.innerHTML = `
+                <div class="flex flex-col items-center justify-center text-neutral-600 h-full text-center fade-in">
+                    <i data-lucide="corner-left-up" class="w-8 h-8 mb-2 text-neutral-700"></i>
+                    <p class="font-medium text-xs">Fill parameters and Execute.</p>
+                </div>
+            `;
+            statusBadgeEl.classList.add('hidden');
+            copyResultBtn.classList.add('hidden');
+            latestResultData = null;
+
+            if (!inputStateCache[currentIndex]) inputStateCache[currentIndex] = {};
+
+            generateForm(request);
+            lucide.createIcons();
+        }
+
+        resetFormBtn.addEventListener('click', () => {
+            if (currentIndex > -1 && confirm('Clear all inputs?')) {
+                inputStateCache[currentIndex] = {};
+                generateForm(collectionData.item[currentIndex].request);
+            }
+        });
+
+        copyResultBtn.addEventListener('click', () => {
+            if (!latestResultData) return;
+            const text = typeof latestResultData === 'object' ? JSON.stringify(latestResultData, null, 2) : String(latestResultData);
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand("copy");
+            textArea.remove();
+
+            document.getElementById('copy-icon-out').classList.add('hidden');
+            document.getElementById('copy-success-icon-out').classList.remove('hidden');
+            setTimeout(() => {
+                document.getElementById('copy-icon-out').classList.remove('hidden');
+                document.getElementById('copy-success-icon-out').classList.add('hidden');
+            }, 2000);
+        });
+
+        function getMappedValue(key) {
+            if (!currentOnuData) return null;
+            const k = key.toLowerCase();
+            
+            // ROBUST MAPPING: Checks multiple variations of common keys
+            if (k === 'referencenumber' || k === 'referenceno') return currentOnuData.referenceNumber || currentOnuData.referenceNo;
+            if (k === 'serialnumber' || k === 'serial') return currentOnuData.serialNumber || currentOnuData.serial;
+            if (k === 'accountnumber' || k === 'accountid') return currentOnuData.accountNumber || currentOnuData.accountId || currentOnuData.accountID;
+            if (k === 'olt') return currentOnuData.oltName || currentOnuData.olt || currentOnuData.OLT;
+            
+            return null;
+        }
+
+        function formatLabel(key) {
+            const result = key.replace(/([A-Z])/g, " $1");
+            return result.charAt(0).toUpperCase() + result.slice(1);
+        }
+
+        function generateForm(request) {
+            formEl.innerHTML = '';
+            originalJsonSchema = {};
+            const currentItemName = collectionData.item[currentIndex].name;
+
+            if (request.method === 'POST' && request.body && request.body.raw) {
+                try {
+                    const parsedBody = JSON.parse(request.body.raw);
+                    if (Object.keys(parsedBody).length === 0) {
+                        formEl.innerHTML = '<div class="text-[11px] text-neutral-500 bg-dark-input p-3 rounded border border-dark-border text-center font-medium">No input parameters required.</div>';
+                    } else {
+                        const grid = document.createElement('div');
+                        grid.className = "grid grid-cols-1 gap-3 fade-in";
+                        for (const [key, value] of Object.entries(parsedBody)) {
+                            originalJsonSchema[key] = typeof value; 
+                            grid.appendChild(createInputField(key, value, 'body'));
+                        }
+                        formEl.appendChild(grid);
+                    }
+                } catch (e) {
+                    const val = inputStateCache[currentIndex]['__raw_body'] ?? request.body.raw;
+                    formEl.innerHTML = `
+                        <div class="space-y-1.5 fade-in">
+                            <label class="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Raw Data Input</label>
+                            <textarea id="raw-body-input" rows="8" class="w-full font-mono text-xs p-2.5 border border-dark-border bg-dark-input rounded focus:ring-1 focus:ring-brand focus:border-brand outline-none text-neutral-300 placeholder-neutral-600 transition-colors">${val}</textarea>
+                        </div>
+                    `;
+                    document.getElementById('raw-body-input').addEventListener('input', e => inputStateCache[currentIndex]['__raw_body'] = e.target.value);
+                }
+            } else if (request.method === 'GET' && request.url.query && request.url.query.length > 0) {
+                const grid = document.createElement('div');
+                grid.className = "grid grid-cols-1 gap-3 fade-in";
+                request.url.query.forEach(q => {
+                    originalJsonSchema[q.key] = 'string';
+                    grid.appendChild(createInputField(q.key, q.value, 'query'));
+                });
+                formEl.appendChild(grid);
+            } else {
+                formEl.innerHTML = '<div class="text-[11px] text-neutral-500 bg-dark-input p-3 rounded border border-dark-border text-center font-medium">No input parameters required.</div>';
+            }
+
+            if (request.header && request.header.length > 0) {
+                const headerSection = document.createElement('div');
+                headerSection.className = "mt-4 pt-4 border-t border-dark-border fade-in";
+                headerSection.innerHTML = `<h4 class="text-[9px] font-bold text-neutral-600 uppercase tracking-widest mb-3 border-b border-dark-border/50 pb-1">Auth & Config</h4>`;
+                
+                request.header.forEach(h => {
+                    const savedVal = inputStateCache[currentIndex][`__header_${h.key}`] ?? h.value;
+                    const wrapper = document.createElement('div');
+                    wrapper.className = "space-y-1 mb-3";
+                    wrapper.innerHTML = `
+                        <label class="block text-[10px] font-bold text-neutral-400 uppercase tracking-wider">${formatLabel(h.key)}</label>
+                        <div class="relative">
+                            <i data-lucide="key" class="w-3.5 h-3.5 absolute left-2.5 top-2 text-neutral-600"></i>
+                            <input type="text" data-header="${h.key}" value="${savedVal}" class="w-full pl-8 pr-2 py-1.5 bg-dark-input border border-dark-border rounded focus:ring-1 focus:ring-brand focus:border-brand outline-none text-xs font-mono text-neutral-200 transition-colors placeholder-neutral-600">
+                        </div>
+                    `;
+                    wrapper.querySelector('input').addEventListener('input', e => inputStateCache[currentIndex][`__header_${h.key}`] = e.target.value);
+                    headerSection.appendChild(wrapper);
+                });
+                formEl.appendChild(headerSection);
+            }
+
+            // NEW FEATURE: Append ONU Command Buttons directly into the Search ONU interface
+            if (currentItemName === "Search ONU") {
+                const commandPanel = document.createElement('div');
+                commandPanel.className = "mt-8 pt-5 border-t border-dark-border fade-in";
+                
+                const targetStatusHtml = currentOnuData 
+                    ? `<span class="text-[9px] bg-green-900/30 text-green-500 px-2 py-0.5 rounded border border-green-800/50 flex items-center gap-1"><div class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>Target Loaded</span>` 
+                    : `<span class="text-[9px] bg-neutral-900 text-neutral-500 px-2 py-0.5 rounded border border-neutral-800">No Target Loaded</span>`;
+
+                commandPanel.innerHTML = `
+                    <div class="flex items-center justify-between mb-3">
+                        <h4 class="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Available Commands</h4>
+                        ${targetStatusHtml}
+                    </div>
+                    <div class="grid grid-cols-2 gap-2" id="quick-action-grid"></div>
+                `;
+
+                const grid = commandPanel.querySelector('#quick-action-grid');
+
+                onuCommands.forEach(cmdName => {
+                    const cmdIndex = collectionData.item.findIndex(i => i.name === cmdName);
+                    if (cmdIndex !== -1) {
+                        const btn = document.createElement('button');
+                        btn.type = "button"; // Prevents form submission
+                        btn.className = "text-left px-2.5 py-2 bg-dark-input border border-dark-border rounded hover:border-brand hover:text-brand transition-colors text-[10px] font-bold text-neutral-400 uppercase tracking-wide truncate shadow-sm flex items-center justify-between group";
+                        btn.innerHTML = `
+                            <span class="truncate">${cmdName}</span>
+                            <i data-lucide="arrow-right" class="w-3 h-3 text-neutral-600 group-hover:text-brand transition-colors shrink-0"></i>
+                        `;
+                        btn.onclick = (e) => {
+                            e.preventDefault();
+                            selectAction(cmdIndex);
+                        };
+                        grid.appendChild(btn);
+                    }
+                });
+
+                formEl.appendChild(commandPanel);
+                lucide.createIcons();
+            }
+        }
+
+        function createInputField(key, defaultValue, type) {
+            const wrapper = document.createElement('div');
+            wrapper.className = "space-y-1";
+            
+            const label = document.createElement('label');
+            label.className = "block text-[10px] font-bold text-neutral-400 uppercase tracking-wider flex items-center gap-2";
+            
+            let mappedVal = getMappedValue(key);
+            const initialValue = mappedVal !== null ? mappedVal : (inputStateCache[currentIndex][key] ?? defaultValue);
+
+            if(mappedVal !== null && !inputStateCache[currentIndex][key]) {
+                label.innerHTML = `${formatLabel(key)} <span class="text-[8px] bg-brand/20 text-brand px-1 py-0.5 rounded leading-none">AUTO</span>`;
+            } else {
+                label.textContent = formatLabel(key);
+            }
+            wrapper.appendChild(label);
+
+            const baseInputClass = "w-full py-1.5 px-2.5 bg-dark-input border border-dark-border rounded focus:ring-1 focus:ring-brand focus:border-brand outline-none text-xs text-neutral-200 placeholder-neutral-700 shadow-sm transition-colors";
+
+            if (typeof defaultValue === 'boolean') {
+                const select = document.createElement('select');
+                select.className = baseInputClass + " cursor-pointer font-semibold";
+                select.dataset.key = key;
+                select.dataset.type = type;
+                
+                const isTrue = initialValue === true || initialValue === 'true';
+                select.innerHTML = `
+                    <option value="true" ${isTrue ? 'selected' : ''}>True</option>
+                    <option value="false" ${!isTrue ? 'selected' : ''}>False</option>
+                `;
+                select.addEventListener('change', e => inputStateCache[currentIndex][key] = e.target.value === 'true');
+                wrapper.appendChild(select);
+            } else if (key.toLowerCase() === 'olt') {
+                const flexDiv = document.createElement('div');
+                flexDiv.className = "flex gap-2";
+
+                let prefix = "VAL007-";
+                let currentOlt = "OLT-02";
+                if (initialValue && initialValue.includes('OLT-')) {
+                    const idx = initialValue.indexOf('OLT-');
+                    prefix = initialValue.substring(0, idx);
+                    currentOlt = initialValue.substring(idx);
+                }
+
+                const prefixInput = document.createElement('input');
+                prefixInput.type = "text";
+                prefixInput.className = "w-1/2 py-1.5 px-2 bg-dark-input border border-dark-border rounded focus:ring-1 focus:ring-brand focus:border-brand outline-none text-xs text-neutral-200 transition-colors font-mono placeholder-neutral-700";
+                prefixInput.value = prefix;
+                prefixInput.placeholder = "Prefix";
+
+                const selectOlt = document.createElement('select');
+                selectOlt.className = "w-1/2 py-1.5 px-2 bg-[#1a1a1a] border border-dark-border rounded focus:ring-1 focus:ring-brand focus:border-brand outline-none text-xs font-semibold text-neutral-200 cursor-pointer transition-colors";
+                
+                for (let i = 1; i <= 10; i++) {
+                    const val = `OLT-${i.toString().padStart(2, '0')}`;
+                    selectOlt.innerHTML += `<option value="${val}" ${currentOlt === val ? 'selected' : ''}>${val}</option>`;
+                }
+
+                const hiddenInput = document.createElement('input');
+                hiddenInput.type = "hidden";
+                hiddenInput.dataset.key = key;
+                hiddenInput.dataset.type = type;
+                hiddenInput.value = initialValue || (prefix + selectOlt.value);
+
+                const updateValue = () => {
+                    const newVal = prefixInput.value + selectOlt.value;
+                    hiddenInput.value = newVal;
+                    inputStateCache[currentIndex][key] = newVal;
+                };
+
+                prefixInput.addEventListener('input', updateValue);
+                selectOlt.addEventListener('change', updateValue);
+
+                flexDiv.appendChild(prefixInput);
+                flexDiv.appendChild(selectOlt);
+                wrapper.appendChild(flexDiv);
+                wrapper.appendChild(hiddenInput);
+            } else {
+                const input = document.createElement('input');
+                input.type = "text";
+                input.className = baseInputClass + " font-mono";
+                input.value = initialValue || '';
+                input.placeholder = `Enter ${formatLabel(key)}...`;
+                input.dataset.key = key;
+                input.dataset.type = type;
+                
+                input.addEventListener('input', e => inputStateCache[currentIndex][key] = e.target.value);
+                wrapper.appendChild(input);
+            }
+
+            return wrapper;
+        }
+
+        function createResultHTML(data, isRoot = true) {
+            if (data === null) return '<span class="text-neutral-500 bg-neutral-900/50 px-1.5 py-0.5 rounded border border-neutral-800 text-[10px] font-mono italic">null</span>';
+            
+            if (typeof data !== 'object') {
+                if (typeof data === 'boolean') {
+                    return data 
+                        ? '<span class="inline-flex items-center gap-1 bg-green-950/50 text-green-500 border border-green-900/50 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"><div class="w-1 h-1 rounded-full bg-green-500"></div>TRUE</span>' 
+                        : '<span class="inline-flex items-center gap-1 bg-red-950/50 text-red-500 border border-red-900/50 px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider"><div class="w-1 h-1 rounded-full bg-red-500"></div>FALSE</span>';
+                }
+                if (typeof data === 'number') {
+                    return `<span class="text-brand font-mono font-bold">${data}</span>`;
+                }
+                return `<span class="text-neutral-300 font-mono break-words">${data}</span>`;
+            }
+
+            let html = `<div class="${isRoot ? 'rounded border border-dark-border overflow-hidden bg-dark-base shadow-sm' : 'border border-dark-border/50 rounded overflow-hidden mt-1 mb-1'}">`;
+            html += `<div class="overflow-x-auto custom-scrollbar"><table class="w-full text-left border-collapse text-xs">`;
+
+            if (Array.isArray(data)) {
+                if (data.length === 0) return '<span class="text-neutral-600 font-mono text-xs">[]</span>';
+                
+                const isArrayOfObjects = data.every(item => item !== null && typeof item === 'object' && !Array.isArray(item));
+                
+                if (isArrayOfObjects) {
+                    const allKeys = Array.from(new Set(data.flatMap(Object.keys)));
+                    
+                    html += `<thead><tr class="bg-dark-input border-b border-dark-border">`;
+                    html += `<th class="p-2 font-bold text-neutral-600 uppercase tracking-widest whitespace-nowrap border-r border-dark-border/30 w-8 text-center">#</th>`;
+                    allKeys.forEach(k => {
+                        html += `<th class="p-2 font-bold text-neutral-400 uppercase tracking-widest whitespace-nowrap border-r border-dark-border/30 last:border-r-0">${formatLabel(k)}</th>`;
+                    });
+                    html += `</tr></thead><tbody class="divide-y divide-dark-border/50">`;
+                    
+                    data.forEach((item, index) => {
+                        html += `<tr class="hover:bg-[#151515] transition-colors">`;
+                        html += `<td class="p-2 align-top border-r border-dark-border/30 text-neutral-600 font-mono text-[10px] text-center bg-dark-input/10">${index + 1}</td>`;
+                        allKeys.forEach(k => {
+                            const valHTML = item[k] !== undefined ? createResultHTML(item[k], false) : '<span class="text-neutral-600 italic">-</span>';
+                            html += `<td class="p-2 align-top border-r border-dark-border/30 last:border-r-0">${valHTML}</td>`;
+                        });
+                        html += `</tr>`;
+                    });
+                    html += `</tbody>`;
+                } else {
+                    html += `<tbody class="divide-y divide-dark-border/50">`;
+                    data.forEach((val, i) => {
+                        html += `<tr class="hover:bg-[#151515] transition-colors">`;
+                        html += `<th class="p-2 font-bold text-neutral-500 uppercase tracking-widest w-12 align-top border-r border-dark-border/50 bg-dark-input/20 text-center">${i}</th>`;
+                        html += `<td class="p-2 align-top">${createResultHTML(val, false)}</td>`;
+                        html += `</tr>`;
+                    });
+                    html += `</tbody>`;
+                }
+            } else {
+                const keys = Object.keys(data);
+                if (keys.length === 0) return '<span class="text-neutral-600 font-mono text-xs">{}</span>';
+                
+                html += `<tbody class="divide-y divide-dark-border/50">`;
+                keys.forEach(key => {
+                    html += `<tr class="hover:bg-[#151515] transition-colors group">`;
+                    html += `<th class="p-2 font-bold text-neutral-400 uppercase tracking-widest w-1/4 min-w-[120px] align-top whitespace-nowrap border-r border-dark-border/50 bg-dark-input/20 group-hover:bg-dark-input/40 transition-colors">${formatLabel(key)}</th>`;
+                    html += `<td class="p-2 align-top break-words">${createResultHTML(data[key], false)}</td>`;
+                    html += `</tr>`;
+                });
+                html += `</tbody>`;
+            }
+            
+            html += `</table></div></div>`;
+            return html;
+        }
+
+        executeBtn.addEventListener('click', async () => {
+            if (currentIndex === -1) return;
+            const request = collectionData.item[currentIndex].request;
+            
+            loadingOverlay.classList.remove('hidden');
+            executeBtn.disabled = true;
+            executeIcon.classList.add('hidden');
+            executeSpinner.classList.remove('hidden');
+            statusBadgeEl.classList.add('hidden');
+            
+            let targetUrl = request.url.raw;
+            let options = { method: request.method, headers: { 'Accept': 'application/json' } };
+
+            if (request.method === 'POST') {
+                options.headers['Content-Type'] = 'application/json';
+                const rawBodyInput = document.getElementById('raw-body-input');
+                
+                if (rawBodyInput) {
+                    options.body = rawBodyInput.value;
+                } else {
+                    const payload = {};
+                    formEl.querySelectorAll('input[data-type="body"], select[data-type="body"]').forEach(input => {
+                        let val = input.value;
+                        if (originalJsonSchema[input.dataset.key] === 'boolean') val = val === 'true';
+                        else if (originalJsonSchema[input.dataset.key] === 'number' && val !== '') val = Number(val);
+                        payload[input.dataset.key] = val;
+                    });
+                    options.body = JSON.stringify(payload);
+                }
+            } else if (request.method === 'GET') {
+                const baseUrl = targetUrl.split('?')[0];
+                const params = new URLSearchParams();
+                formEl.querySelectorAll('input[data-type="query"]').forEach(input => {
+                    if(input.value) params.append(input.dataset.key, input.value);
+                });
+                const qs = params.toString();
+                targetUrl = qs ? `${baseUrl}?${qs}` : baseUrl;
+            }
+
+            formEl.querySelectorAll('input[data-header]').forEach(input => {
+                if(input.value) options.headers[input.dataset.header] = input.value;
+            });
+
+            let fetchUrl = useProxyCheckbox.checked ? 'https://corsproxy.io/?' + encodeURIComponent(targetUrl) : targetUrl;
+
+            try {
+                const startTime = performance.now();
+                const res = await fetch(fetchUrl, options);
+                const text = await res.text();
+                
+                let data = text;
+                try { data = JSON.parse(text); } catch(e) {}
+                
+                const time = performance.now() - startTime;
+                const result = { ok: res.ok, status: res.status, data, time };
+                
+                latestResultData = data;
+                copyResultBtn.classList.remove('hidden');
+
+                // ROBUST INTERCEPT: Handles various API response tree variations safely
+                if (collectionData.item[currentIndex].name === "Search ONU" && result.ok) {
+                    try {
+                        const searchData = result.data;
+                        let list = null;
+                        
+                        if (Array.isArray(searchData?.data?.list)) list = searchData.data.list;
+                        else if (Array.isArray(searchData?.list)) list = searchData.list;
+                        else if (Array.isArray(searchData?.data)) list = searchData.data;
+                        else if (Array.isArray(searchData)) list = searchData;
+
+                        if (list && list.length > 0) {
+                            currentOnuData = list[0];
+                            inputStateCache = {}; // Wipe cache to force auto-fill on next screen
+                            
+                            // Re-render form quietly to update the Target Loaded status badge without switching screens
+                            generateForm(request); 
+                            renderSidebar(); 
+                        }
+                    } catch (e) {
+                        console.error("Failed to parse ONU Search Data", e);
+                    }
+                }
+
+                statusBadgeEl.classList.remove('hidden');
+                
+                if (result.ok) {
+                    statusBadgeEl.textContent = `SUCCESS`;
+                    statusBadgeEl.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest transition-all fade-in bg-green-900/40 text-green-400 border border-green-800/50 flex items-center h-5';
+                } else {
+                    statusBadgeEl.textContent = `FAILED`;
+                    statusBadgeEl.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest transition-all fade-in bg-red-900/40 text-red-400 border border-red-800/50 flex items-center h-5';
+                }
+
+                resultContainer.innerHTML = `<div class="fade-in">
+                    <div class="border ${result.ok ? 'border-green-900/50' : 'border-red-900/50'} rounded overflow-hidden">
+                        <div class="px-3 py-1.5 border-b ${result.ok ? 'border-green-900/50 bg-green-900/10' : 'border-red-900/50 bg-red-900/10'} flex justify-between items-center">
+                            <span class="font-bold text-[10px] uppercase tracking-wider ${result.ok ? 'text-green-500' : 'text-red-500'}">Payload</span>
+                            <span class="text-[10px] font-mono ${result.ok ? 'text-green-600/70' : 'text-red-600/70'}">${result.status} • ${Math.round(result.time)}ms</span>
+                        </div>
+                        <div class="p-3 overflow-x-auto bg-[#0a0a0a]">
+                            ${createResultHTML(result.data, true)}
+                        </div>
+                    </div>
+                </div>`;
+                lucide.createIcons();
+            } catch (error) {
+                statusBadgeEl.classList.remove('hidden');
+                statusBadgeEl.textContent = 'ERROR';
+                statusBadgeEl.className = 'px-1.5 py-0.5 rounded text-[9px] font-bold tracking-widest transition-all fade-in bg-red-900/40 text-red-400 border border-red-800/50 flex items-center h-5';
+                
+                latestResultData = null;
+                copyResultBtn.classList.add('hidden');
+
+                // Advanced Error messaging to detect IP blockages via proxy
+                let tipMessage = 'Tip: This may be a CORS security issue. Try enabling the Network Proxy toggle.';
+                if (useProxyCheckbox.checked && targetUrl.includes('http://161.')) {
+                    tipMessage = 'Tip: Public proxies block raw IP addresses for security. You must disable the proxy to execute this specific IP target, but your browser may block it due to Mixed Content.';
+                }
+
+                resultContainer.innerHTML = `
+                    <div class="fade-in bg-red-950/20 rounded p-4 border border-red-900/50 flex gap-3">
+                        <i data-lucide="alert-triangle" class="w-5 h-5 text-red-500 shrink-0"></i>
+                        <div>
+                            <h4 class="text-red-400 font-bold mb-1 text-sm">System Execution Failed</h4>
+                            <p class="text-red-300 text-xs mb-2">${error.message}</p>
+                            <p class="text-neutral-500 text-[10px] bg-dark-base p-1.5 rounded border border-dark-border">${tipMessage}</p>
+                        </div>
+                    </div>`;
+                lucide.createIcons();
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                executeBtn.disabled = false;
+                executeIcon.classList.remove('hidden');
+                executeSpinner.classList.add('hidden');
+            }
+        });
+
+        // Init Setup
+        renderSidebar();
+        selectAction(0);
+
+    </script>
+</body>
+</html>

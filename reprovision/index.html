@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mass Reprovisioning Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .status-scroll::-webkit-scrollbar { width: 6px; }
+        .status-scroll::-webkit-scrollbar-track { background: #f1f1f1; }
+        .status-scroll::-webkit-scrollbar-thumb { background: #888; border-radius: 10px; }
+        .status-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .animate-pulse-slow { animation: pulse-slow 1s infinite; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans text-slate-900">
+
+    <div class="max-w-5xl mx-auto py-10 px-4">
+        <header class="mb-8 text-center">
+            <h1 class="text-3xl font-bold text-slate-800 tracking-tight">Fiber Reprovisioning Tool</h1>
+            <p class="text-slate-500 mt-2 text-sm italic">Status: Version 5.1 - Simplified Status Feedback</p>
+        </header>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Session Config -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Authentication (Required)</h3>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold uppercase mb-1">WSC-Token</label>
+                        <input id="wscToken" type="text" class="w-full p-2 border border-slate-300 rounded text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" value="de86b04f-5080-4a31-a8ca-89b704702340">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold uppercase mb-1">WSC-Timestamp (Auto-generates if empty)</label>
+                        <input id="wscTimestamp" type="text" class="w-full p-2 border border-slate-300 rounded text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Leave empty for Current Time">
+                    </div>
+                </div>
+
+                <!-- Reference Numbers -->
+                <div class="space-y-4">
+                    <h3 class="text-xs font-bold text-indigo-600 uppercase tracking-wider">Payloads</h3>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold uppercase mb-1">Reference Numbers (One per line)</label>
+                        <textarea id="payloadList" rows="4" class="w-full p-2 border border-slate-300 rounded text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="S2S_..."></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                <div class="flex items-center gap-4">
+                    <div class="text-xs text-slate-400 font-mono">
+                        Queue: <span id="countLabel" class="text-slate-600 font-bold">0</span>
+                    </div>
+                    <select id="proxySelector" class="bg-slate-100 border-none rounded px-3 py-1 text-xs font-medium text-slate-600 outline-none">
+                        <option value="proxy1">Proxy: CORSProxy.io</option>
+                        <option value="proxy2">Proxy: AllOrigins</option>
+                    </select>
+                </div>
+                <button id="startBtn" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-12 rounded-lg transition-all shadow-md active:scale-95 disabled:bg-slate-300">
+                    Process Batch
+                </button>
+            </div>
+        </div>
+
+        <!-- Processing Feedback -->
+        <div id="progressCard" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <div class="flex items-center gap-3">
+                    <h2 class="font-bold text-slate-800">Live Traffic</h2>
+                    <span id="intervalIndicator" class="hidden text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-bold animate-pulse-slow uppercase tracking-wider">Active</span>
+                </div>
+                <span id="progressText" class="text-sm font-mono font-bold text-indigo-600">0/0</span>
+            </div>
+            
+            <div class="w-full bg-slate-100 rounded-full h-2 mb-6 overflow-hidden">
+                <div id="progressBar" class="bg-indigo-600 h-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            
+            <div class="border rounded-lg overflow-hidden border-slate-200">
+                <div class="grid grid-cols-12 bg-slate-100 text-[10px] font-bold text-slate-500 uppercase p-2 border-b">
+                    <div class="col-span-3">Reference</div>
+                    <div class="col-span-2">Status</div>
+                    <div class="col-span-7">Server Message</div>
+                </div>
+                <div id="statusList" class="status-scroll h-80 overflow-y-auto divide-y bg-white"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const textarea = document.getElementById('payloadList');
+        const countLabel = document.getElementById('countLabel');
+        const startBtn = document.getElementById('startBtn');
+        const proxySelector = document.getElementById('proxySelector');
+        const progressCard = document.getElementById('progressCard');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const statusList = document.getElementById('statusList');
+        const intervalIndicator = document.getElementById('intervalIndicator');
+        
+        const wscTokenInput = document.getElementById('wscToken');
+        const wscTimestampInput = document.getElementById('wscTimestamp');
+
+        let completedCount = 0;
+        let total = 0;
+
+        textarea.addEventListener('input', () => {
+            const lines = textarea.value.trim().split(/\n/).filter(line => line.trim() !== '');
+            countLabel.textContent = lines.length;
+        });
+
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+        async function processItem(refNum, logElement) {
+            const badge = logElement.querySelector('.status-badge');
+            const messageArea = logElement.querySelector('.server-msg');
+            
+            const targetUrl = "https://csp.s2s.ph/api/prepaid-fiber-tool";
+            const selectedProxy = proxySelector.value;
+            
+            let finalUrl = targetUrl;
+            if (selectedProxy === 'proxy1') {
+                finalUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            } else if (selectedProxy === 'proxy2') {
+                finalUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+            }
+
+            try {
+                const formData = new FormData();
+                formData.append('method', 'reprovision');
+                const cleanRef = refNum.startsWith('S2S_') ? refNum : `S2S_${refNum}`;
+                formData.append('referenceNumber', cleanRef);
+
+                const currentTimestamp = wscTimestampInput.value || Date.now().toString();
+
+                const response = await fetch(finalUrl, {
+                    method: "POST",
+                    headers: {
+                        "accept": "*/*",
+                        "wsc-token": wscTokenInput.value.trim(),
+                        "wsc-timestamp": currentTimestamp,
+                        "x-requested-with": "XMLHttpRequest",
+                        "Referer": "https://csp.s2s.ph/"
+                    },
+                    body: formData
+                });
+                
+                let responseText = "";
+                if (selectedProxy === 'proxy2') {
+                    const data = await response.json();
+                    responseText = data.contents;
+                } else {
+                    responseText = await response.text();
+                }
+                
+                badge.classList.remove('animate-pulse', 'bg-slate-200', 'text-slate-500');
+                
+                let statusVal = false;
+                let serverMsg = "Unknown Response";
+                
+                try {
+                    const json = JSON.parse(responseText);
+                    statusVal = json.status === true;
+                    serverMsg = json.message || "No message provided";
+                } catch(e) {
+                    statusVal = response.ok;
+                    serverMsg = responseText.substring(0, 50);
+                }
+
+                if (statusVal) {
+                    badge.textContent = "TRUE";
+                    badge.className = "status-badge px-2 py-0.5 rounded font-black text-[9px] bg-emerald-100 text-emerald-600 uppercase";
+                    messageArea.textContent = serverMsg;
+                    messageArea.className = "col-span-7 server-msg text-emerald-600 font-medium truncate pr-2";
+                } else {
+                    badge.textContent = "FALSE";
+                    badge.className = "status-badge px-2 py-0.5 rounded font-black text-[9px] bg-rose-100 text-rose-600 uppercase";
+                    messageArea.textContent = serverMsg;
+                    messageArea.className = "col-span-7 server-msg text-rose-400 font-mono text-[10px] truncate pr-2";
+                }
+            } catch (e) {
+                badge.classList.remove('animate-pulse', 'bg-slate-200', 'text-slate-500');
+                badge.textContent = "FALSE";
+                badge.className = "status-badge px-2 py-0.5 rounded font-black text-[9px] bg-rose-100 text-rose-600 uppercase";
+                messageArea.className = "col-span-7 server-msg text-rose-400 font-mono text-[10px] truncate pr-2";
+                messageArea.textContent = e.message;
+            } finally {
+                completedCount++;
+                const percent = Math.floor((completedCount / total) * 100);
+                progressBar.style.width = percent + '%';
+                progressText.textContent = `${completedCount} / ${total}`;
+                
+                if (completedCount === total) {
+                    startBtn.disabled = false;
+                    textarea.disabled = false;
+                    intervalIndicator.classList.add('hidden');
+                }
+            }
+        }
+
+        startBtn.addEventListener('click', async () => {
+            const list = textarea.value.trim().split(/\n/).filter(line => line.trim() !== '');
+            if (list.length === 0) return;
+
+            total = list.length;
+            completedCount = 0;
+            startBtn.disabled = true;
+            textarea.disabled = true;
+            progressCard.classList.remove('hidden');
+            statusList.innerHTML = '';
+            
+            for (let i = 0; i < list.length; i++) {
+                const refNum = list[i].trim();
+                const item = document.createElement('div');
+                item.className = "grid grid-cols-12 items-center p-2 text-[11px] border-b hover:bg-slate-50";
+                item.innerHTML = `
+                    <div class="col-span-3 font-mono font-bold text-slate-700">${refNum}</div>
+                    <div class="col-span-2"><span class="status-badge px-2 py-0.5 rounded font-black text-[9px] bg-slate-200 text-slate-500 uppercase animate-pulse">Wait</span></div>
+                    <div class="col-span-7 server-msg text-slate-400 italic truncate pr-2 tracking-tight">Processing...</div>
+                `;
+                statusList.prepend(item);
+                
+                processItem(refNum, item);
+                await delay(1200); 
+            }
+        });
+    </script>
+</body>
+</html>

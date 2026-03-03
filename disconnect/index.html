@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk User Disconnect Tool</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans text-gray-900">
+
+    <div class="max-w-5xl mx-auto p-4 md:p-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-indigo-700">Bulk Disconnect Processor</h1>
+            <p class="text-gray-600">Process thousands of usernames with controlled concurrency.</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Configuration Panel -->
+            <div class="lg:col-span-1 space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-lg font-semibold mb-4 flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="Wait12 15V3m0 0L8 7m4-4l4 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"></path></svg>
+                        Settings
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">PHPSESSID Cookie</label>
+                            <input type="text" id="sessionCookie" value="1nei2f1tvg3cti16sgocpgmhl7" 
+                                class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Concurrency (Limit)</label>
+                            <input type="number" id="concurrency" value="10" min="1" max="50"
+                                class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+
+                        <div class="pt-4 border-t border-gray-100">
+                            <div class="flex justify-between text-sm mb-1">
+                                <span class="text-gray-500">Progress</span>
+                                <span id="progressPercent" class="font-bold text-indigo-600">0%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div id="progressBar" class="bg-indigo-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2 text-center text-xs font-bold uppercase tracking-wider">
+                            <div class="bg-green-50 p-2 rounded border border-green-100 text-green-700">
+                                <div>Success</div>
+                                <div id="successCount" class="text-lg">0</div>
+                            </div>
+                            <div class="bg-red-50 p-2 rounded border border-red-100 text-red-700">
+                                <div>Failed</div>
+                                <div id="failCount" class="text-lg">0</div>
+                            </div>
+                        </div>
+
+                        <button id="startBtn" onclick="startProcessing()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md">
+                            Start Processing
+                        </button>
+                        <button id="stopBtn" onclick="stopProcessing()" class="hidden w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-4 rounded-lg transition-colors shadow-md">
+                            Stop Execution
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input and Logs -->
+            <div class="lg:col-span-2 space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <h2 class="text-lg font-semibold mb-4">Input Usernames</h2>
+                    <textarea id="usernamesInput" placeholder="Paste thousands of usernames here (one per line or comma separated)..." 
+                        class="w-full h-48 p-4 text-sm font-mono border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 custom-scrollbar"
+                    ></textarea>
+                    <p class="mt-2 text-xs text-gray-400 text-right" id="inputStats">Count: 0</p>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                        <h2 class="text-lg font-semibold">Live Logs</h2>
+                        <button onclick="clearLogs()" class="text-xs text-indigo-500 hover:underline">Clear Logs</button>
+                    </div>
+                    <div id="logContainer" class="h-64 overflow-y-auto p-4 space-y-2 bg-gray-900 text-xs font-mono text-gray-300 custom-scrollbar">
+                        <div class="text-gray-500 italic">Logs will appear here once processing starts...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isRunning = false;
+        let successCount = 0;
+        let failCount = 0;
+        let stopRequested = false;
+
+        const usernamesInput = document.getElementById('usernamesInput');
+        const inputStats = document.getElementById('inputStats');
+
+        // Update count as user pastes
+        usernamesInput.addEventListener('input', () => {
+            const list = getUsernameList();
+            inputStats.innerText = `Count: ${list.length}`;
+        });
+
+        function getUsernameList() {
+            const raw = usernamesInput.value;
+            return raw.split(/[\n,]+/).map(u => u.trim()).filter(u => u.length > 0);
+        }
+
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            
+            let color = 'text-gray-300';
+            if (type === 'success') color = 'text-green-400';
+            if (type === 'error') color = 'text-red-400';
+            if (type === 'warning') color = 'text-yellow-400';
+
+            logEntry.className = color;
+            logEntry.innerHTML = `<span class="text-gray-600">[${time}]</span> ${message}`;
+            
+            container.appendChild(logEntry);
+            container.scrollTop = container.scrollHeight;
+            
+            // Keep log size manageable
+            if (container.childNodes.length > 500) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logContainer').innerHTML = '';
+        }
+
+        function updateUI(total, processed) {
+            const percent = Math.round((processed / total) * 100) || 0;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+            document.getElementById('progressPercent').innerText = `${percent}%`;
+            document.getElementById('successCount').innerText = successCount;
+            document.getElementById('failCount').innerText = failCount;
+        }
+
+        function stopProcessing() {
+            stopRequested = true;
+            addLog("Stop signal sent. Finishing current batch...", "warning");
+        }
+
+        async function processUser(username, sessionCookie) {
+            try {
+                const response = await fetch("http://161.49.61.47/disconnect_userv3.php", {
+                    "headers": {
+                        "accept": "*/*",
+                        "accept-language": "en-US,en;q=0.6",
+                        "content-type": "application/json",
+                        "sec-gpc": "1",
+                        "cookie": `PHPSESSID=${sessionCookie}`,
+                        "Referer": "http://161.49.61.47/show_account_informations_uat.php"
+                    },
+                    "body": JSON.stringify({
+                        "trans": "disconnect",
+                        "usrname": username
+                    }),
+                    "method": "POST"
+                });
+
+                if (response.ok) {
+                    successCount++;
+                    addLog(`Success: ${username}`, 'success');
+                } else {
+                    failCount++;
+                    addLog(`Failed: ${username} (Status: ${response.status})`, 'error');
+                }
+            } catch (err) {
+                failCount++;
+                addLog(`Error: ${username} - ${err.message}`, 'error');
+            }
+        }
+
+        async function startProcessing() {
+            const list = getUsernameList();
+            const sessionCookie = document.getElementById('sessionCookie').value;
+            const concurrency = parseInt(document.getElementById('concurrency').value) || 10;
+
+            if (list.length === 0) {
+                alert("Please enter at least one username.");
+                return;
+            }
+
+            // UI Reset
+            isRunning = true;
+            stopRequested = false;
+            successCount = 0;
+            failCount = 0;
+            updateUI(list.length, 0);
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('stopBtn').classList.remove('hidden');
+            clearLogs();
+            addLog(`Starting batch process for ${list.length} users...`, 'info');
+
+            const queue = [...list];
+            const total = list.length;
+            let processed = 0;
+
+            // Worker implementation for concurrency
+            async function worker() {
+                while (queue.length > 0 && !stopRequested) {
+                    const username = queue.shift();
+                    await processUser(username, sessionCookie);
+                    processed++;
+                    updateUI(total, processed);
+                }
+            }
+
+            // Create worker pool
+            const pool = [];
+            for (let i = 0; i < Math.min(concurrency, list.length); i++) {
+                pool.push(worker());
+            }
+
+            await Promise.all(pool);
+
+            // Completion
+            isRunning = false;
+            document.getElementById('startBtn').classList.remove('hidden');
+            document.getElementById('stopBtn').classList.add('hidden');
+            
+            if (stopRequested) {
+                addLog("Execution stopped by user.", "warning");
+            } else {
+                addLog("Processing Complete.", "success");
+            }
+        }
+    </script>
+</body>
+</html>

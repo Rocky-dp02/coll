@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IBAS Master Batcher</title>
+    <style>
+        :root {
+            --bg: #0b0e14; --card: #151921; --primary: #00d4ff; --success: #00ff88;
+            --error: #ff4d4d; --text: #f8fafc; --border: #2d343f; --sidebar-w: 400px;
+        }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: var(--sidebar-w); background: var(--card); border-right: 1px solid var(--border); padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .logo { font-weight: 900; font-size: 1.2rem; color: var(--primary); letter-spacing: -0.5px; }
+        textarea { background: #0b0e14; border: 1px solid var(--border); padding: 12px; border-radius: 8px; color: white; outline: none; font-family: monospace; font-size: 0.8rem; resize: none; flex-grow: 1; }
+        input { background: #0b0e14; border: 1px solid var(--border); padding: 10px; border-radius: 8px; color: white; margin-bottom: 10px; }
+        
+        .btn { padding: 12px; border: none; border-radius: 8px; font-weight: 700; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-add { background: var(--primary); color: #0b0e14; }
+        .btn-start { background: var(--success); color: #0b0e14; }
+
+        /* Main Content Split */
+        .main { flex: 1; display: flex; flex-direction: column; height: 100vh; }
+        
+        /* Summary Top Bar */
+        .summary-section { height: 35%; background: #0f172a; border-bottom: 2px solid var(--border); padding: 20px; overflow-y: auto; }
+        .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+        .summary-card { background: var(--card); padding: 10px; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .summary-sn { font-size: 0.8rem; font-weight: bold; }
+        
+        /* Logs Bottom Bar */
+        .logs-section { flex: 1; padding: 20px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th { text-align: left; background: #1c232d; padding: 10px; position: sticky; top: 0; }
+        td { padding: 8px 10px; border-bottom: 1px solid #1e2530; }
+
+        /* Badges */
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase; }
+        .badge-wait { background: #334155; color: #94a3b8; }
+        .badge-ok { background: var(--success); color: #000; box-shadow: 0 0 10px rgba(0, 255, 136, 0.4); }
+        .badge-fail { background: #451a1a; color: var(--error); }
+        
+        .tag-running { color: var(--primary); animation: blink 1s infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="logo">IBAS OPERATOR PRO</div>
+    
+    <div style="display: flex; flex-direction: column; flex-grow: 1; gap: 5px;">
+        <label style="font-size: 0.7rem; color: #64748b; font-weight: bold;">BULK INPUT (SN REF PREFIX)</label>
+        <textarea id="bulkInput" placeholder="Copy-paste multiple rows from Excel here..."></textarea>
+    </div>
+
+    <input type="text" id="defaultPrefix" placeholder="Default OLT Prefix (VAL007)" oninput="savePrefix()">
+    
+    <button class="btn btn-add" onclick="queueRows()">Add to Worklist</button>
+    <button id="startBtn" class="btn btn-start" onclick="runEngine()">🚀 Process All</button>
+    <button class="btn" style="background: transparent; color: var(--error); font-size: 0.7rem;" onclick="location.reload()">Reset Page</button>
+</div>
+
+<div class="main">
+    <div class="summary-section">
+        <h3 style="margin-top:0; font-size: 0.9rem; color: var(--primary);">UNIT ACTIVATION SUMMARY</h3>
+        <div id="summaryGrid" class="summary-grid">
+            </div>
+    </div>
+
+    <div class="logs-section">
+        <h3 style="margin-top:0; font-size: 0.9rem; color: #64748b;">DETAILED EXECUTION LOGS</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>OLT TARGET</th>
+                    <th>SERIAL / REFERENCE</th>
+                    <th>STATUS</th>
+                    <th>API RESPONSE</th>
+                </tr>
+            </thead>
+            <tbody id="logBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let masterQueue = [];
+    let snTracker = {}; // Tracks activation state per Serial Number
+
+    window.onload = () => {
+        const saved = localStorage.getItem('ibas_p3');
+        if (saved) document.getElementById('defaultPrefix').value = saved;
+    };
+
+    function savePrefix() {
+        localStorage.setItem('ibas_p3', document.getElementById('defaultPrefix').value.trim());
+    }
+
+    function queueRows() {
+        const raw = document.getElementById('bulkInput').value.trim();
+        const globalPrefix = document.getElementById('defaultPrefix').value.trim();
+        if (!raw) return;
+
+        const lines = raw.split('\n');
+        lines.forEach(line => {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length >= 2) {
+                const sn = parts[0].toUpperCase();
+                const ref = parts[1];
+                const prefix = parts[2] || globalPrefix;
+
+                if (!snTracker[sn]) {
+                    snTracker[sn] = { status: 'pending', count: 0 };
+                    createSummaryCard(sn);
+                }
+
+                for (let i = 1; i <= 10; i++) {
+                    const olt = `${prefix}-OLT-${i.toString().padStart(2, '0')}`;
+                    const taskId = 't-' + Math.random().toString(36).substr(2, 9);
+                    
+                    masterQueue.push({ id: taskId, sn, ref, olt, status: 'pending' });
+                    renderLogRow(taskId, olt, sn, ref);
+                }
+            }
+        });
+        document.getElementById('bulkInput').value = '';
+    }
+
+    function createSummaryCard(sn) {
+        const grid = document.getElementById('summaryGrid');
+        const card = document.createElement('div');
+        card.className = 'summary-card';
+        card.id = `sum-${sn}`;
+        card.innerHTML = `
+            <span class="summary-sn">${sn}</span>
+            <span id="badge-${sn}" class="badge badge-wait">Pending</span>
+        `;
+        grid.prepend(card);
+    }
+
+    function renderLogRow(id, olt, sn, ref) {
+        const body = document.getElementById('logBody');
+        const tr = document.createElement('tr');
+        tr.id = `row-${id}`;
+        tr.innerHTML = `
+            <td style="color:var(--primary); font-weight:bold;">${olt}</td>
+            <td>${sn}<br><small style="color:#64748b">${ref}</small></td>
+            <td><span id="tag-${id}" class="tag-pending">Queued</span></td>
+            <td><span id="msg-${id}" style="color:#444; font-family:monospace;">-</span></td>
+        `;
+        body.prepend(tr);
+    }
+
+    async function runEngine() {
+        const pending = masterQueue.filter(t => t.status === 'pending');
+        if (!pending.length) return;
+
+        document.getElementById('startBtn').disabled = true;
+        
+        // Process in concurrent chunks
+        const CHUNK_SIZE = 15;
+        for (let i = 0; i < pending.length; i += CHUNK_SIZE) {
+            const chunk = pending.slice(i, i + CHUNK_SIZE);
+            await Promise.all(chunk.map(task => execute(task)));
+        }
+
+        document.getElementById('startBtn').disabled = false;
+        alert("All requests processed.");
+    }
+
+    async function execute(task) {
+        const tag = document.getElementById(`tag-${task.id}`);
+        const msg = document.getElementById(`msg-${task.id}`);
+        const badge = document.getElementById(`badge-${task.sn}`);
+        
+        task.status = 'running';
+        tag.className = 'tag-running';
+        tag.innerText = 'Running...';
+
+        try {
+            const res = await fetch('https://ibas.s2s.ph/api/ibas/manual/activate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ serialNumber: task.sn, referenceNumber: task.ref, olt: task.olt })
+            });
+            const data = await res.json();
+            const strRes = JSON.stringify(data);
+            msg.innerText = strRes;
+
+            if (res.ok && (strRes.toLowerCase().includes('success') || data.status === 'success')) {
+                tag.style.color = 'var(--success)';
+                tag.innerText = 'SUCCESS';
+                // Mark summary card as activated
+                snTracker[task.sn].status = 'activated';
+                badge.className = 'badge badge-ok';
+                badge.innerText = 'ACTIVATED';
+            } else {
+                tag.style.color = 'var(--error)';
+                tag.innerText = 'FAILED';
+            }
+        } catch (e) {
+            tag.innerText = 'ERROR';
+            msg.innerText = "Network Issue";
+        }
+    }
+</script>
+
+</body>
+</html>

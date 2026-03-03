@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AXION_PREMIUM_TERMINAL_v5.1</title>
+    <style>
+        :root {
+            --primary: #00f2ff;
+            --secondary: #7000ff;
+            --warning: #ffb400;
+            --danger: #ff0055;
+            --success: #00ff88;
+            --bg-base: #050505;
+            --bg-panel: rgba(15, 15, 20, 0.8);
+            --border-glow: rgba(0, 242, 255, 0.2);
+            --text-dim: #8899a6;
+            --text-bright: #e1e8ed;
+            --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+        }
+
+        [data-theme="light"] {
+            --primary: #007791;
+            --secondary: #5500aa;
+            --bg-base: #f0f2f5;
+            --bg-panel: rgba(255, 255, 255, 0.9);
+            --border-glow: rgba(0, 0, 0, 0.1);
+            --text-dim: #555;
+            --text-bright: #111;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: var(--font-mono);
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary) transparent;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-bright);
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(112, 0, 255, 0.05) 0%, transparent 80%),
+                linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.1) 50%);
+            background-size: 100% 100%, 100% 2px;
+        }
+
+        .app-shell {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            gap: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .glass-header {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            padding: 12px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 8px;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .brand-logo {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+        }
+
+        .brand-text h1 {
+            margin: 0;
+            font-size: 1.1rem;
+            letter-spacing: 4px;
+            color: var(--primary);
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        .control-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            background: var(--bg-panel);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--border-glow);
+            align-items: flex-end;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        .input-group label {
+            font-size: 0.65rem;
+            color: var(--primary);
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .modern-input {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid #444;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            transition: all 0.3s;
+            width: 100%;
+        }
+
+        .modern-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 10px rgba(0, 242, 255, 0.2);
+            outline: none;
+        }
+
+        .action-cluster {
+            display: flex;
+            gap: 8px;
+        }
+
+        .neon-btn {
+            background: transparent;
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            transition: all 0.2s;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .neon-btn:hover:not(:disabled) {
+            background: var(--primary);
+            color: black;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .neon-btn.primary {
+            background: var(--primary);
+            color: black;
+        }
+
+        .neon-btn:disabled {
+            opacity: 0.4;
+            cursor: wait;
+            border-color: #555;
+            color: #555;
+        }
+
+        .data-workspace {
+            flex: 1;
+            background: var(--bg-panel);
+            border: 1px solid var(--border-glow);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .scroll-container {
+            overflow: auto;
+            height: 100%;
+        }
+
+        .mega-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .mega-table th {
+            position: sticky;
+            top: 0;
+            background: #111;
+            padding: 14px 12px;
+            font-size: 0.65rem;
+            text-align: left;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary);
+            z-index: 10;
+            cursor: pointer;
+        }
+
+        .mega-table td {
+            padding: 10px 12px;
+            font-size: 0.75rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text-dim);
+        }
+
+        .mega-table tr:hover td {
+            background: rgba(0, 242, 255, 0.05);
+            color: white;
+        }
+
+        .badge {
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            border: 1px solid;
+        }
+
+        .badge-activated { color: var(--success); border-color: var(--success); background: rgba(0,255,136,0.1); }
+        .badge-pending { color: var(--warning); border-color: var(--warning); background: rgba(255,180,0,0.1); }
+
+        .loader-bar {
+            height: 4px;
+            width: 100%;
+            background: #111;
+            display: none;
+        }
+
+        .loader-fill {
+            height: 100%;
+            width: 0%;
+            background: var(--primary);
+            box-shadow: 0 0 10px var(--primary);
+            transition: width 0.1s;
+        }
+
+        .status-bar {
+            background: var(--bg-panel);
+            border-top: 1px solid var(--border-glow);
+            padding: 8px 24px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.65rem;
+            color: var(--text-dim);
+        }
+
+        /* Updated Column Widths */
+        .col-id { width: 90px; }
+        .col-stat { width: 100px; }
+        .col-fname { width: 120px; }
+        .col-lname { width: 120px; }
+        .col-acct { width: 130px; }
+        .col-ref { width: 180px; }
+        .col-loc { width: 130px; }
+        .col-time { width: 180px; }
+    </style>
+</head>
+<body>
+
+<div class="app-shell">
+    <header class="glass-header">
+        <div class="brand">
+            <div class="brand-logo"></div>
+            <div class="brand-text"><h1>NOIR_SYSTEM_TERMINAL_SIGNUP_DATABASE</h1></div>
+        </div>
+        <div style="display: flex; gap: 20px; align-items: center;">
+            <div id="clock" style="color: var(--primary); font-weight: bold;">00:00:00</div>
+            <div class="badge badge-activated">ENCRYPTED_STREAM</div>
+        </div>
+    </header>
+
+    <div class="loader-bar" id="loader-bar">
+        <div class="loader-fill" id="loader-fill"></div>
+    </div>
+
+    <section class="control-grid">
+        <div class="input-group">
+            <label>AUTH_TOKEN</label>
+            <input type="password" id="token" class="modern-input" placeholder="WSC-TOKEN-HEX">
+        </div>
+        <div class="input-group">
+            <label>GLOBAL_SEARCH</label>
+            <input type="text" id="search" class="modern-input" placeholder="Name, Account, or Ref...">
+        </div>
+        <div class="input-group" style="max-width: 200px;">
+            <label>STATUS_FILTER</label>
+            <select id="statusFilter" class="modern-input" onchange="applyFilters()">
+                <option value="ALL">ALL_RECORDS</option>
+                <option value="ACTIVATED">ACTIVATED</option>
+                <option value="PENDING">PENDING</option>
+                <option value="FAILED">FAILED</option>
+            </select>
+        </div>
+        <div class="action-cluster">
+            <button class="neon-btn primary" id="fetch-btn" onclick="startBulkLoad()">SYNC_DATABASE</button>
+            <button class="neon-btn" onclick="exportCSV()">CSV_DUMP</button>
+            <button class="neon-btn" onclick="toggleTheme()" id="theme-btn">UI_THEME</button>
+        </div>
+    </section>
+
+    <div class="data-workspace">
+        <div class="scroll-container">
+            <table class="mega-table">
+                <thead>
+                    <tr>
+                        <th class="col-id" onclick="sortTable('_id')">UID</th>
+                        <th class="col-stat" onclick="sortTable('status')">STATUS</th>
+                        <th class="col-fname" onclick="sortTable('firstName')">FIRST_NAME</th>
+                        <th class="col-lname" onclick="sortTable('lastName')">LAST_NAME</th>
+                        <th class="col-acct" onclick="sortTable('acct')">ACCOUNT_NO</th>
+                        <th class="col-ref">REF_HASH</th>
+                        <th class="col-loc">CITY</th>
+                        <th class="col-loc">BARANGAY</th>
+                        <th class="col-loc">NAP_ID</th>
+                        <th class="col-id">PORT</th>
+                        <th class="col-time" onclick="sortTable('time')">TIMESTAMP</th>
+                    </tr>
+                </thead>
+                <tbody id="data-stream"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <footer class="status-bar">
+        <div style="display: flex; gap: 20px;">
+            <span>TOTAL_SYNCED: <b id="count" style="color: var(--primary)">0</b></span>
+            <span>API_STATUS: <b id="status-msg">READY</b></span>
+        </div>
+        <div>SESSION: <span id="session-info">UNAUTH</span> | AXION © 2026</div>
+    </footer>
+</div>
+
+<script>
+    let masterData = [];
+    let filteredData = [];
+    let sortConfig = { field: 'time', direction: 'desc' };
+
+    function updateClock() {
+        document.getElementById('clock').innerText = new Date().toLocaleTimeString();
+    }
+    setInterval(updateClock, 1000);
+
+    function toggleTheme() {
+        const body = document.body;
+        const current = body.getAttribute('data-theme');
+        body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+
+    function sortTable(field) {
+        if (sortConfig.field === field) {
+            sortConfig.direction = sortConfig.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            sortConfig.field = field;
+            sortConfig.direction = 'asc';
+        }
+        applyFilters();
+    }
+
+    function applyFilters() {
+        const statusVal = document.getElementById('statusFilter').value;
+        const searchVal = document.getElementById('search').value.toLowerCase();
+
+        filteredData = masterData.filter(item => {
+            const matchesStatus = statusVal === 'ALL' || item.status === statusVal;
+            const matchesSearch = !searchVal || 
+                item.firstName.toLowerCase().includes(searchVal) || 
+                item.lastName.toLowerCase().includes(searchVal) || 
+                item.acct.includes(searchVal) || 
+                item.ref.includes(searchVal);
+            return matchesStatus && matchesSearch;
+        });
+
+        filteredData.sort((a, b) => {
+            let valA = a[sortConfig.field];
+            let valB = b[sortConfig.field];
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        renderTable();
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('data-stream');
+        tbody.innerHTML = filteredData.map(item => `
+            <tr>
+                <td style="color:#555">#${item._id}</td>
+                <td><span class="badge badge-${item.status.toLowerCase()}">${item.status}</span></td>
+                <td style="color:var(--primary); font-weight:bold;">${item.firstName}</td>
+                <td style="color:var(--primary); font-weight:bold;">${item.lastName}</td>
+                <td style="color:var(--success)">${item.acct}</td>
+                <td style="font-size:0.6rem; color:#666">${item.ref}</td>
+                <td>${item.city}</td>
+                <td>${item.brgy}</td>
+                <td style="color:var(--warning)">${item.nap}</td>
+                <td><b>${item.port}</b></td>
+                <td style="font-size:0.65rem">${item.time}</td>
+            </tr>
+        `).join('');
+        document.getElementById('count').innerText = filteredData.length;
+    }
+
+    async function startBulkLoad() {
+        const token = document.getElementById('token').value.trim();
+        const search = document.getElementById('search').value.trim();
+        const btn = document.getElementById('fetch-btn');
+        const loader = document.getElementById('loader-bar');
+        const loaderFill = document.getElementById('loader-fill');
+
+        if (!token) return;
+
+        btn.disabled = true;
+        loader.style.display = 'block';
+        masterData = [];
+        
+        try {
+            const headers = { "wsc-token": token, "x-requested-with": "XMLHttpRequest" };
+            
+            document.getElementById('status-msg').innerText = "CALCULATING_TOTAL...";
+            const metaUrl = `https://ibas.s2s.ph/api/dashboard/port-reservation?status=&page=1&limit=1&searchVal=${encodeURIComponent(search)}`;
+            const metaRes = await fetch(metaUrl, { headers }).then(r => r.json());
+            const total = metaRes.data.total;
+            
+            const chunkSize = 200;
+            const totalPages = Math.ceil(total / chunkSize);
+
+            for (let p = 1; p <= totalPages; p++) {
+                document.getElementById('status-msg').innerText = `SYNCING_PAGE_${p}_OF_${totalPages}`;
+                loaderFill.style.width = `${(p / totalPages) * 100}%`;
+
+                const url = `https://ibas.s2s.ph/api/dashboard/port-reservation?status=&page=${p}&limit=${chunkSize}&searchVal=${encodeURIComponent(search)}`;
+                const res = await fetch(url, { headers }).then(r => r.json());
+                
+                if (res.data?.portReservations) {
+                    const mapped = res.data.portReservations.map(row => {
+                        const cust = row.customer?.[0] || {};
+                        return {
+                            _id: row._id,
+                            status: row.status,
+                            firstName: row.firstName || '---',
+                            lastName: row.lastName || '---',
+                            acct: cust.accountNumber || '---',
+                            ref: row.referenceNumber,
+                            city: cust.city || '---',
+                            brgy: cust.barangay || '---',
+                            nap: row.napCode || cust.napCode || '---',
+                            port: row.port || cust.port || '--',
+                            time: row.createdDateTimeLabel
+                        };
+                    });
+                    masterData = masterData.concat(mapped);
+                    applyFilters();
+                }
+            }
+
+            document.getElementById('status-msg').innerText = "SYNC_COMPLETE";
+            document.getElementById('session-info').innerText = token.substring(0, 8) + '...';
+        } catch (e) {
+            document.getElementById('status-msg').innerText = "STREAM_ERROR";
+            console.error(e);
+        } finally {
+            btn.disabled = false;
+            loader.style.display = 'none';
+        }
+    }
+
+    function exportCSV() {
+        if (!filteredData.length) return;
+        const headers = ["ID", "STATUS", "FIRST_NAME", "LAST_NAME", "ACCOUNT", "REF", "CITY", "BRGY", "NAP", "PORT", "DATE"];
+        const rows = filteredData.map(i => [i._id, i.status, i.firstName, i.lastName, i.acct, i.ref, i.city, i.brgy, i.nap, i.port, i.time]);
+        const csvContent = [headers, ...rows].map(e => e.join(",")).join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `AXION_EXPORT_${Date.now()}.csv`;
+        link.click();
+    }
+</script>
+
+</body>
+</html>
